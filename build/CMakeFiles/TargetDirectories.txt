@@ -1,0 +1,1 @@
+/home/stylx/projects/discord/build/CMakeFiles/discord.dir
