@@ -197,3 +197,6 @@ Project Target=discord,discord
 Use External Terminal=false
 Working Directory=
 isExecutable=false
+
+[Project]
+VersionControlSupport=kdevgit
