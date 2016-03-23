@@ -5,6 +5,8 @@ std::complex< double > _1 = std::complex< double > ( 1.0,0.0 );
 std::complex< double > _neg_1 = std::complex< double > ( -1.0,0.0 );
 std::complex< double > _i = std::complex< double > ( 0.0,1.0 );
 std::complex< double > _neg_i = std::complex< double > ( 0.0,-1.0 );
+double _1_[2] = {1,0};
+double _0_[2] = {0,0};
 
 
 gsl_rng * _R_G = initialise_random_number_gernerators();
@@ -56,6 +58,7 @@ matrix_eigenvalues (
     LAPACKE_zhseqr ( LAPACK_ROW_MAJOR, 'E', 'N', size, 1, size, copy, size,
                      eigen, 0, size );
 
+
     }
 
 void
@@ -67,7 +70,7 @@ matrix_eigenvalues (
 
     std::complex < double >*copy;
 
-    copy = new std::complex < double >[size * size];
+    copy = new std::complex < double >[size * size]();
 
     matrix_copy ( cmat, copy, size );
 
@@ -120,52 +123,25 @@ sample_random_ginibre_matrix ( std::complex < double > * cmat,int size )
 
     {
 
-    for ( int i = 0; i < size; ++i )
+    for ( int i = 0; i < size*size; ++i )
         {
-
-        for ( int j = 0; j < size; ++j )
-            {
-
-            cmat[j + size * i] = std::complex < double > ( gsl_ran_gaussian_ziggurat ( _R_G,1 ), gsl_ran_gaussian_ziggurat ( _R_G,1 ) );
-
-            }
-
+        cmat[i] = std::complex < double > ( gsl_ran_gaussian_ziggurat ( _R_G,1 ), gsl_ran_gaussian_ziggurat ( _R_G,1 ) );
         }
 
     }
 
 void
-sample_density_matrix_hs (
-    std::complex < double >*out,
-    int size )
+sample_density_matrix_hs ( std::complex < double >*out,
+                           int size )
     {
+// generate a ginibre matrix X ; do U=X*(X^H) ; do U=U/tr(U); return U
 
-    std::complex < double >*buffer;
+    std::complex < double > * buffer;
     buffer = new std::complex < double >[size * size];
 
     sample_random_ginibre_matrix ( buffer, size );
 
-    for ( int i = 0; i < size; ++i )
-        {
-
-        for ( int j = 0; j < size; ++j )
-            {
-
-            out[j + size * i] = std::complex < double > (
-                                    0,
-                                    0 );
-
-            for ( int k = 0; k < size; ++k )
-                {
-
-                out[j + size * i] +=
-                    buffer[k + i * size] * std::conj ( buffer[k + j * size] );
-
-                }
-
-            }
-
-        }
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasConjTrans,size,size,size,_1_,buffer,size,buffer,size,_0_,out,size );
 
     buffer[0] = matrix_trace_nxn ( out, size );
     buffer[0] = 1.0 / buffer[0];
@@ -193,15 +169,11 @@ sample_density_matrix_up (
         for ( int j = 0; j < size; ++j )
             {
 
-            out[j + size * i] = std::complex < double > (
-                                    0,
-                                    0 );
+            out[j + size * i] = std::complex < double > ( 0,0 );
 
             for ( int k = 0; k < size; ++k )
                 {
-
-                out[j + size * i] +=
-                    buff[k + i * size] * tau[k] * std::conj ( buff[k + j * size] );
+                out[j + size * i] += buff[k + i * size] * tau[k] * std::conj ( buff[k + j * size] );
                 }
 
             }
@@ -246,7 +218,7 @@ sample_unitary_matrix (
     for ( int i = 0; i < size; ++i )
         {
 
-        temp_v[i] = cmat[i * ( size + 1 )] / abs ( cmat[i * ( size + 1 )] );
+        temp_v[i] = cmat[i * ( size + 1 )] / std::abs ( cmat[i * ( size + 1 )] );
 
         }
 
@@ -288,7 +260,7 @@ sample_unitary_matrix (
     for ( int i = 0; i < size; ++i )
         {
 
-        temp[i] = cmat[i * ( size + 1 )] / abs ( cmat[i * ( size + 1 )] );
+        temp[i] = cmat[i * ( size + 1 )] / std::abs ( cmat[i * ( size + 1 )] );
 
         }
 
@@ -314,200 +286,6 @@ sample_unitary_matrix (
     }
 
 void
-sample_separable_density_matrix_hs (
-    std::complex < double >*cmat,
-    int *sub_spaces,
-    int tot_nr_subspaces,
-    int size )
-    {
-
-    int dim_check = 1;
-    int curr_dim = 1;
-    int max_dim = 1;
-
-    for ( int i = 0; i < tot_nr_subspaces; ++i )
-        {
-        dim_check *= sub_spaces[i];
-        if ( max_dim < sub_spaces[i] )
-            {
-            max_dim = sub_spaces[i];
-            }
-        }
-
-    if ( dim_check != size )
-        {
-        std::cout <<
-                  "ERROR IN FUNCTION sample_separable_density_matrix: INCOMPATIBLE DIMENSIONS";
-        return;
-        }
-
-    std::complex < double >*local_unitary,
-        *local_unitary_hc, *local_density, *temp, *temp_global;
-
-    temp_global = new std::complex < double >[dim_check * dim_check];
-    temp_global[0] = std::complex < double > ( 1,0 );
-
-    local_unitary = new std::complex < double >[max_dim * max_dim];
-    local_unitary_hc = new std::complex < double >[max_dim * max_dim];
-    local_density = new std::complex < double >[max_dim * max_dim];
-    temp = new std::complex < double >[max_dim * max_dim];
-
-    for ( int i = tot_nr_subspaces - 1; i >= 0; --i )
-        {
-
-        sample_density_matrix_hs ( local_density, sub_spaces[i] );
-        sample_unitary_matrix ( local_unitary, sub_spaces[i] );
-        matrix_hermitian_conjugate ( local_unitary, local_unitary_hc,sub_spaces[i] );
-        matrix_mlt ( local_density, local_unitary_hc, temp, sub_spaces[i] );
-        matrix_mlt ( local_unitary, temp, local_density, sub_spaces[i] );
-        matrix_tensor_prod ( local_density, sub_spaces[i], temp_global, curr_dim,cmat, curr_dim * sub_spaces[i] );
-
-        curr_dim *= sub_spaces[i];
-        matrix_copy ( cmat, temp_global, curr_dim );
-
-        }
-
-    delete[]temp_global;
-    delete[]local_unitary;
-    delete[]local_unitary_hc;
-    delete[]local_density;
-    delete[]temp;
-
-    }
-
-void
-sample_separable_density_matrix_up (
-    std::complex < double >*cmat,
-    int *sub_spaces,
-    int tot_nr_subspaces,
-    int size )
-    {
-
-    int dim_check = 1;
-    int curr_dim = 1;
-    int max_dim = 1;
-
-    for ( int i = 0; i < tot_nr_subspaces; ++i )
-        {
-        dim_check *= sub_spaces[i];
-        if ( max_dim < sub_spaces[i] )
-            {
-            max_dim = sub_spaces[i];
-            }
-        }
-
-    if ( dim_check != size )
-        {
-        std::cout <<
-                  "ERROR IN FUNCTION sample_separable_density_matrix: INCOMPATIBLE DIMENSIONS";
-        return;
-        }
-
-    std::complex < double >*local_unitary,
-        *local_unitary_hc, *local_density, *temp, *temp_global;
-
-    temp_global = new std::complex < double >[dim_check * dim_check];
-    temp_global[0] = std::complex < double > (
-                         1,
-                         0 );
-
-    local_unitary = new std::complex < double >[max_dim * max_dim];
-    local_unitary_hc = new std::complex < double >[max_dim * max_dim];
-    local_density = new std::complex < double >[max_dim * max_dim];
-    temp = new std::complex < double >[max_dim * max_dim];
-
-    for ( int i = tot_nr_subspaces - 1; i >= 0; --i )
-        {
-
-        sample_density_matrix_up ( local_density, sub_spaces[i] );
-        sample_unitary_matrix ( local_unitary, sub_spaces[i] );
-
-        matrix_hermitian_conjugate ( local_unitary, local_unitary_hc, sub_spaces[i] );
-
-        matrix_mlt ( local_density, local_unitary_hc, temp, sub_spaces[i] );
-        matrix_mlt ( local_unitary, temp, local_density, sub_spaces[i] );
-        matrix_tensor_prod ( local_density, sub_spaces[i], temp_global, curr_dim, cmat, curr_dim * sub_spaces[i] );
-
-        curr_dim *= sub_spaces[i];
-        matrix_copy ( cmat, temp_global, curr_dim );
-
-        }
-
-    delete[]temp_global;
-    delete[]local_unitary;
-    delete[]local_unitary_hc;
-    delete[]local_density;
-    delete[]temp;
-
-    }
-
-void
-sample_separable_pure_density_matrix (
-    std::complex < double >*cmat,
-    int size,
-    int *sub_spaces,
-    int tot_nr_subspaces )
-    {
-
-    int dim_check = 1;
-    int curr_dim = 1;
-    int max_dim = 1;
-
-    for ( int i = 0; i < tot_nr_subspaces; ++i )
-        {
-        dim_check *= sub_spaces[i];
-        if ( max_dim < sub_spaces[i] )
-            {
-            max_dim = sub_spaces[i];
-            }
-        }
-
-    if ( dim_check != size )
-        {
-        std::cout <<
-                  "ERROR IN FUNCTION sample_separable_density_matrix: INCOMPATIBLE DIMENSIONS";
-        return;
-        }
-
-    std::complex < double >*local_unitary,
-        *local_unitary_hc, *local_density, *temp, *temp_global;
-
-    temp_global = new std::complex < double >[dim_check * dim_check];
-    temp_global[0] = std::complex < double > (
-                         1,
-                         0 );
-
-    local_unitary = new std::complex < double >[max_dim * max_dim];
-    local_unitary_hc = new std::complex < double >[max_dim * max_dim];
-    local_density = new std::complex < double >[max_dim * max_dim];
-    temp = new std::complex < double >[max_dim * max_dim];
-
-    for ( int i = tot_nr_subspaces - 1; i >= 0; --i )
-        {
-
-        sample_pure_density_matrix ( local_density, sub_spaces[i] );
-        sample_unitary_matrix ( local_unitary, sub_spaces[i] );
-
-        matrix_hermitian_conjugate ( local_unitary, local_unitary_hc, sub_spaces[i] );
-
-        matrix_mlt ( local_density, local_unitary_hc, temp, sub_spaces[i] );
-        matrix_mlt ( local_unitary, temp, local_density, sub_spaces[i] );
-        matrix_tensor_prod ( local_density, sub_spaces[i], temp_global, curr_dim, cmat, curr_dim * sub_spaces[i] );
-
-        curr_dim *= sub_spaces[i];
-        matrix_copy ( cmat, temp_global, curr_dim );
-
-        }
-
-    delete[]temp_global;
-    delete[]local_unitary;
-    delete[]local_unitary_hc;
-    delete[]local_density;
-    delete[]temp;
-
-    }
-
-void
 sample_pure_density_matrix (
     std::complex < double >*out,
     int size )
@@ -517,33 +295,79 @@ sample_pure_density_matrix (
     cvec = new std::complex < double >[size];
 
     sample_unitary_matrix ( out, size );
-    matrix_get_column ( 1, out, cvec, size );
+    matrix_get_column ( 0, out, cvec, size );
     vector_dyadic_self ( cvec, out, size );
 
     delete[]cvec;
 
     }
 
-void
-sample_uniform_2_sphere_rad_sqrt_r (
-    gsl_complex * z )
+void sample_pure_density_matrix2 ( std::complex < double >*out,
+                                   int size )
+    {
+    std::complex <double> * temp_cmat1 = new std::complex<double>[size*size];
+
+    sample_random_ginibre_matrix ( temp_cmat1, size );
+
+    for ( int i = 0 ; i < size ; ++i )
+        {
+        for ( int j = 0; j < size ; ++j )
+            {
+            for ( int inner = 0; inner < size; ++inner )
+                {
+                out[i*size+j] = temp_cmat1[i*size+inner] * std::conj ( temp_cmat1[j*size+inner] );
+                }
+            }
+        }
+
+    double t = matrix_trace_nxn ( out,size ).real();
+    t= 1/t;
+
+    matrix_scalar_mult ( out,t,size );
+    delete[]temp_cmat1;
+
+    }
+void sample_separable_state ( std::complex <double> * out,int nr_mixtures ,int * subspaces , int nr_subspaces,int dim_tot ) // generates mixture of productstates with nr_para terms.
     {
 
-    /* This function samples Uniformly a complex number from a 2-sphere of radius sqrt(r), r stored in the real part
-     *of the argument*/
-    double r = sqrt ( GSL_REAL ( *z ) );
-    GSL_SET_COMPLEX ( z, gsl_ran_exponential ( _R_G, 1 ),
-                      gsl_ran_exponential ( _R_G, 1 ) );
-    r *=1 / sqrt ( GSL_REAL ( *z ) * GSL_REAL ( *z ) + GSL_IMAG ( *z ) * GSL_IMAG ( *z ) );
+    std::complex <double> * coefficients = new std::complex <double>[nr_mixtures]();
+    std::complex <double> * temp_cmat1 = new std::complex<double>[dim_tot*dim_tot]();
+    std::complex <double> * temp_cmat2 = new std::complex<double>[dim_tot*dim_tot]();
+    std::complex <double> * temp_cmat3 = new std::complex<double>[dim_tot*dim_tot]();
+    int curr_dim;
+    abs ( subspaces[nr_subspaces-1] );
+    matrix_initialize_zero ( out,dim_tot );
 
-    GSL_SET_COMPLEX ( z, r * GSL_REAL ( *z ), r * GSL_IMAG ( *z ) );
+    sample_uniform_n_simplex ( coefficients,nr_mixtures );
+
+    for ( int i = 0 ; i < nr_mixtures; ++i )
+        {
+
+        curr_dim = abs ( subspaces[nr_subspaces-1] );
+        sample_pure_density_matrix ( temp_cmat1,curr_dim );
+
+        for ( int j = nr_subspaces-2; j>=0 ; --j )
+            {
+
+            sample_pure_density_matrix ( temp_cmat2,abs ( subspaces[j] ) );
+            matrix_tensor_prod ( temp_cmat2,abs ( subspaces[j] ),temp_cmat1,curr_dim,temp_cmat3,abs ( curr_dim*subspaces[j] ) );
+            curr_dim *=  abs ( subspaces[j] );
+            matrix_copy ( temp_cmat3,temp_cmat1,curr_dim );
+            }
+        matrix_add_to_first ( out,temp_cmat1,coefficients[i],dim_tot );
+
+        }
+
+    delete[]coefficients;
+    delete[]temp_cmat1;
+    delete[]temp_cmat2;
+    delete[]temp_cmat3;
 
     }
 
 void
-sample_uniform_n_simplex (
-    std::complex < double >*carr,
-    int size )
+sample_uniform_n_simplex ( std::complex < double >*carr,
+                           int size )
     {
 
     double buff = 0;
@@ -551,10 +375,7 @@ sample_uniform_n_simplex (
     for ( int i = 0; i < size; ++i )
         {
 
-        carr[i] = std::complex < double > (
-                      gsl_ran_exponential ( _R_G,
-                                            1 ),
-                      0 );
+        carr[i] = std::complex < double > ( gsl_ran_exponential ( _R_G, 1 ),0 );
         buff += carr[i].real ();
 
         }
@@ -567,44 +388,9 @@ sample_uniform_n_simplex (
         carr[i] = carr[i] * buff;
 
         }
-
     }
 
-void
-sample_uniform_n_simplex2 (
-    std::complex < double >*carr,
-    int size )
-    {
-
-    // we generate an Uniform Ordered array with Sum arr[i] = 1
-    // 1) generate n exp distributed x
-
-    carr[0] = std::complex < double > (
-                  0,
-                  0 );
-
-    for ( int i = 1; i < size; ++i )
-        {
-
-        carr[i] = std::complex < double > (
-                      gsl_rng_uniform ( _R_G ),
-                      0 );
-        }
-
-    sort_vec_asc ( carr, size );
-
-    for ( int i = 0; i < size - 1; ++i )
-        {
-
-        carr[i] = ( carr[i + 1] - carr[i] );
-
-        }
-
-    carr[size - 1] = ( 1.0, 0.0 ) - carr[size - 1];
-
-    }
-
-void
+void 
 matrix_show (
     std::complex < double >*cmat,
     int n )
@@ -679,6 +465,31 @@ matrix_show (
     }
 
 template < typename T >
+void
+matrix_show (
+    T * mat,
+    int dim_i, int dim_j )
+    {
+
+    for ( int i = 0; i < dim_i; ++i )
+        {
+
+        for ( int j = 0; j < dim_j; ++j )
+            {
+
+            std::cout << mat[j + dim_j * i] << " ";
+
+            }
+
+        std::cout << std::endl;
+
+        }
+
+    std::cout << std::endl << std::endl;
+
+    }
+
+template < typename T >
 void vector_show (
     T * vec,
     int n )
@@ -694,9 +505,9 @@ void vector_show (
     std::cout << std::endl << std::endl;
 
     }
-    
-   
-    
+
+
+
 
 void
 vector_write_to_file (
@@ -909,6 +720,28 @@ matrix_hermitian_conjugate (
 
     }
 
+void matrix_hermitian_conjugate (
+    std::complex < double >*in,
+    std::complex < double >*out,
+    int dim_i, int dim_j )
+    {
+
+    for ( int i = 0; i < dim_i; ++i )
+        {
+
+        for ( int j = 0; j < dim_j; ++j )
+            {
+
+            out[j*dim_i+i] = std::conj ( in[i*dim_j+j] );
+
+            }
+
+        }
+
+    }
+
+
+
 void
 matrix_hermitian_conjugate (
     std::complex < double >*in,
@@ -1003,55 +836,6 @@ matrix_tensor_prod (
     }
 
 void
-matrix_tensor_prod (
-    double *in1,
-    int dim_in1,
-    double *in2,
-    int dim_in2,
-    double *out,
-    int dim_out )
-    {
-
-    int index_out = dim_in1 * dim_in2;
-    int m = 0;
-    if ( index_out == dim_out )
-        {
-
-        for ( int i = 0; i < dim_in1; ++i )
-            {
-
-            for ( int k = 0; k < dim_in2; ++k )
-                {
-
-                for ( int j = 0; j < dim_in1; ++j )
-                    {
-
-                    for ( int l = 0; l < dim_in2; ++l )
-                        {
-
-                        out[m] = in1[i * dim_in1 + j] * in2[k * dim_in2 + l];
-                        m++;
-
-                        }
-
-                    }
-
-                }
-
-            }
-
-        }
-
-    else
-        {
-
-        std::cout << "ERROR IN TENSOR PRODUCT. INCOMPATIBLE DIMENSIONS";
-
-        }
-
-    }
-
-void
 transpose_block_mxm_at_offset_in_nxn (
     std::complex < double >*in,
     std::complex < double >*out,
@@ -1067,10 +851,8 @@ transpose_block_mxm_at_offset_in_nxn (
         for ( int j = 0; j < dim_sub; ++j )
             {
 
-            out[ ( offset_i + j ) * dim + offset_j +
-                 i].real ( in[offset_j + j + dim * ( i + offset_i )].real () );
-            out[ ( offset_i + j ) * dim + offset_j +
-                 i].imag ( in[offset_j + j + dim * ( i + offset_i )].imag () );
+            out[ ( offset_i + j ) * dim + offset_j +i].real ( in[offset_j + j + dim * ( i + offset_i )].real () );
+            out[ ( offset_i + j ) * dim + offset_j +i].imag ( in[offset_j + j + dim * ( i + offset_i )].imag () );
 
             }
 
@@ -1225,6 +1007,10 @@ state_partial_transpose_nxn (
 
     int steps = 0;
 
+    std::complex < double > * temp = new std::complex< double > [dim_in * dim_in];
+
+    matrix_copy ( in, temp, dim_in );
+
     for ( int i = 0; i < tot_nr_subspaces; ++i )
         {
 
@@ -1234,13 +1020,8 @@ state_partial_transpose_nxn (
 
         steps = dim_in / sub_mat_size;
 
-        //std::cout << "steps =" << (int) steps << std::endl;
-        //std::cout << "sub_mat_size=" << sub_mat_size << std::endl;
-        //std::cout << "block_size =" << block_size<< std::endl;
-
         if ( transpose_vector[i] < 0 )
             {
-
             for ( int j = 0; j < steps; ++j )
                 {
 
@@ -1251,7 +1032,7 @@ state_partial_transpose_nxn (
 
                     //  std::cout << "offset j =" << k*sub_mat_size << std::endl ;
 
-                    flip_block_kxk_in_block_mxm_in_nxn ( in, out, dim_in,
+                    flip_block_kxk_in_block_mxm_in_nxn ( temp, out, dim_in,
                                                          j * dim_in *
                                                          sub_mat_size,
                                                          k * sub_mat_size,
@@ -1261,12 +1042,13 @@ state_partial_transpose_nxn (
                     }
 
                 }
-
+            matrix_copy ( out, temp,dim_in );
             }
 
         }
-
+    delete[] temp;
     }
+
 
 std::complex < double >
 matrix_trace_nxn (
@@ -1382,7 +1164,7 @@ state_decohere_on_subspace_ran (
         //show_matrix(temp1,tot_dim);
         matrix_mlt ( temp1, total_op, temp2, tot_dim );
         //show_matrix(temp2,tot_dim);
-        matrix_add_to_first ( out, temp2, 1.0, tot_dim );
+        matrix_add_to_first ( out, temp2, std::complex<double> ( 1,0 ), tot_dim );
         //show_matrix(out,tot_dim);
 
         }
@@ -1395,119 +1177,24 @@ state_decohere_on_subspace_ran (
 
     }
 
-void
-state_decohere_on_subspace_ran (
-    std::complex < double >*const in,
-    std::complex < double >*out,
-    int dim_in,
-    int *dec_vector,
-    int tot_nr_subspaces,
-    std::complex < double >*temp1,
-    std::complex < double >*temp2,
-    std::complex < double >*total_op,
-    std::complex < double >*random_unitary,
-    std::complex < double >*basis_vector )
-    {
-
-    int curr_dim = 1;
-    int abs_dim = 0;
-    int tot_dim = 1;
-    int dim_dec = 0;		// <------------------------------------------------------
-    int witness = 0;
-    matrix_initialize_zero ( out, tot_dim );
-
-    for ( int i = 0; i < tot_nr_subspaces; ++i )
-        {
-        tot_dim *= abs ( dec_vector[i] );
-        if ( dec_vector[i] < 0 )
-            {
-            dim_dec = -dec_vector[i];
-            ++witness;
-            }
-        }
-    if ( witness > 1 )
-        {
-        std::cout <<
-                  "Error in function Decorhere_on_subspace: only one subspace to decohere allowed";
-        }
-    if ( ( dim_in = !tot_dim ) )
-        {
-        std::cout <<
-                  "Error in function decohere on subspace: dimension missmatch";
-        return;
-        }
-
-    sample_unitary_matrix ( random_unitary, basis_vector, temp1, dim_dec );
-
-    //---------------------------------------------------------------------------------------------------------------------
-
-    for ( int i = 0; i < dim_dec; ++i )
-        {
-
-        temp1[0] = std::complex < double > (
-                       1.0,
-                       0 );
-        curr_dim = 1;
-
-        for ( int j = tot_nr_subspaces - 1; j >= 0; --j )
-            {
-
-            abs_dim = abs ( dec_vector[j] );
-
-            if ( dec_vector[j] < 0 )
-                {
-
-                matrix_get_column ( i, random_unitary, basis_vector, abs_dim );
-                vector_dyadic_self ( basis_vector, temp2, abs_dim );
-                }
-
-            else
-                {
-
-                matrix_initialize_unity ( temp2, abs_dim );
-                //show_matrix(temp2,2);
-
-                }
-
-            matrix_tensor_prod ( temp2, abs_dim, temp1, curr_dim, total_op,
-                                 curr_dim * abs_dim );
-            //std::cout << curr_dim << std::endl;
-            curr_dim *= abs_dim;
-            //show_matrix(total_op,curr_dim);
-            matrix_copy ( total_op, temp1, curr_dim );
-            //std::cout << curr_dim << std::endl;
-            //matrix_show ( total_op, curr_dim );
-
-            }
-
-        matrix_mlt ( total_op, in, temp1, tot_dim );
-        //show_matrix(temp1,tot_dim);
-        matrix_mlt ( temp1, total_op, temp2, tot_dim );
-        //show_matrix(temp2,tot_dim);
-        matrix_add_to_first ( out, temp2, 1.0, tot_dim );
-        //show_matrix(out,tot_dim);
-
-        }
-
-    }
 
 void
-state_decohere_on_subspace (
+state_decohere_on_subspace ( // this function calculates RHO_A/B
     const std::complex < double >*const in,
     std::complex < double >*out,
     const std::complex < double >* const unitary,
     int dim_in,
-    int * dec_v,
+    int * dec_v, // vector that gives the subspace on witch to decohere: {2,2,-2} will apply 1x1xP ...
     int tot_nr_subspaces )
     {
 
     int curr_dim = 1;
     int abs_dim = 0;
     int tot_dim = 1;
-    int dim_dec = 0;		// <------------------------------------------------------
+    int dim_dec = 0;		// <-----------dimension of the space to decohere
     int witness = 0;
-   
-    for ( int i = 0; i < tot_nr_subspaces; ++i )
+
+    for ( int i = 0; i < tot_nr_subspaces; ++i )   // <--- checking that only one subspace is decohered
         {
         tot_dim *= abs ( dec_v[i] );
         if ( dec_v[i] < 0 )
@@ -1542,13 +1229,13 @@ state_decohere_on_subspace (
 
     matrix_initialize_zero ( out, tot_dim );
 
-    for ( int i = 0; i < dim_dec; ++i )
+    for ( int i = 0; i < dim_dec; ++i )               // <---- now constructing the projectors.
         {
 
         temp1[0] = std::complex < double > ( 1.0 , 0 );
         curr_dim = 1;
 
-        for ( int j = tot_nr_subspaces - 1; j >= 0; --j )
+        for ( int j = tot_nr_subspaces - 1; j >= 0; --j )    // starting in reverse oder because of the tensor product.
             {
 
             abs_dim = abs ( dec_v[j] );
@@ -1556,7 +1243,7 @@ state_decohere_on_subspace (
             if ( dec_v[j] < 0 )
                 {
 
-                matrix_get_column ( i, unitary, basis_vector, abs_dim );
+                matrix_get_column ( i, unitary, basis_vector, abs_dim );  // takes the i th column of the unitary matrix and construct a Projektor
                 vector_dyadic_self ( basis_vector, temp2, abs_dim );
                 //show_matrix(temp2,2);
                 }
@@ -1564,13 +1251,12 @@ state_decohere_on_subspace (
             else
                 {
 
-                matrix_initialize_unity ( temp2, abs_dim );
+                matrix_initialize_unity ( temp2, abs_dim );  // in the case of the invariant subspace the unity matrix is taken
                 //show_matrix(temp2,2);
 
                 }
 
-            matrix_tensor_prod ( temp2, abs_dim, temp1, curr_dim, total_op,
-                                 curr_dim * abs_dim );
+            matrix_tensor_prod ( temp2, abs_dim, temp1, curr_dim, total_op,curr_dim * abs_dim ); // construct tensorproduct and proceed the same with next subspace.
             //std::cout << curr_dim << std::endl;
             curr_dim *= abs_dim;
             //show_matrix(total_op,curr_dim);
@@ -1584,7 +1270,7 @@ state_decohere_on_subspace (
         //show_matrix(temp1,tot_dim);
         matrix_mlt ( temp1, total_op, temp2, tot_dim );
         //show_matrix(temp2,tot_dim);
-        matrix_add_to_first ( out, temp2, 1.0, tot_dim );
+        matrix_add_to_first ( out, temp2,std::complex<double> ( 1.0,0.0 ), tot_dim ); //  here we build the sum    P x rho x P
         //show_matrix(out,tot_dim);
 
         }
@@ -1681,7 +1367,7 @@ state_decohere_on_subspace (
         //show_matrix(temp1,tot_dim);
         matrix_mlt ( temp1, total_op, temp2, tot_dim );
         //show_matrix(temp2,tot_dim);
-        matrix_add_to_first ( out, temp2, 1.0, tot_dim );
+        matrix_add_to_first ( out, temp2,std::complex<double> ( 1,0 ), tot_dim );
         //show_matrix(out,tot_dim);
 
         }
@@ -1706,37 +1392,6 @@ matrix_get_column (
 
     }
 
-void
-matrix_get_partial_column (
-    int col,
-    int col_lenght,
-    std::complex < double >*cmat,
-    std::complex < double >*out,
-    int size )
-    {
-
-    for ( int i = 0; i < col_lenght; ++i )
-        {
-        out[i] = cmat[i * size + col];
-        }
-
-    }
-void
-matrix_set_partial_column (
-    int col,
-    int col_lenght,
-    std::complex < double >*cvec,
-    std::complex < double >*out,
-    int size )
-    {
-
-    for ( int i = 0; i < col_lenght; ++i )
-        {
-	  out[i * size + col]=cvec[i];
-        }
-
-    }
-    
 
 void
 matrix_normalize (
@@ -1764,19 +1419,13 @@ void
 matrix_add (
     std::complex < double >*cmat1,
     std::complex < double >*cmat2,
+    double factor,
+    std::complex < double >*out,
     int size )
     {
-
-    for ( int i = 0; i < size; ++i )
+    for ( int i = 0; i < size*size ; ++i )
         {
-
-        for ( int j = 0; j < size; ++j )
-            {
-
-            cmat1[i * size + j] = cmat1[i * size + j] + cmat2[i * size + j];
-
-            }
-
+        out[i] = cmat1[i] + factor * cmat2[i];
         }
 
     }
@@ -1806,22 +1455,14 @@ void
 matrix_add_to_first (
     std::complex < double >*cmat1,
     std::complex < double >*cmat2,
-    double factor,
+    std::complex < double > factor,
     int size )
     {
 
-    for ( int i = 0; i < size; ++i )
+    for ( int i = 0; i < size*size; ++i )
         {
-
-        for ( int j = 0; j < size; ++j )
-            {
-
-            cmat1[i * size + j] += cmat2[i * size + j] * factor;
-
-            }
-
+        cmat1[i] += cmat2[i] * factor;
         }
-
     }
 
 void
@@ -1860,12 +1501,9 @@ vector_add_to_first (
 
     }
 
-void
-matrix_mlt (
-    const std::complex < double >*cmat1,
-    const std::complex < double >*cmat2,
-    std::complex < double >*out,
-    int size )
+void matrix_mlt2 ( const std::complex< double >* cmat1,
+                   const std::complex< double >* cmat2,
+                   std::complex< double >* out, int size )
     {
 
     for ( int i = 0; i < size; ++i )
@@ -1874,9 +1512,7 @@ matrix_mlt (
         for ( int j = 0; j < size; ++j )
             {
 
-            out[i * size + j] = std::complex < double > (
-                                    0,
-                                    0 );
+            out[i * size + j] = std::complex < double > ( 0,0 );
 
             for ( int k = 0; k < size; ++k )
                 {
@@ -1891,6 +1527,34 @@ matrix_mlt (
 
     }
 
+void matrix_mlt ( const std::complex< double >* cmat1,
+                  const std::complex< double >* cmat2,
+                  std::complex< double >* out, int size )
+    {
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasNoTrans,size,size,size,_1_,cmat1,size,cmat2,size,_0_,out,size );
+
+    }
+
+
+template < typename T >
+void matrix_multiplication ( T * in_1, int dim_i_1, int dim_j_1, T * in_2, int dim_i_2 , int dim_j_2 ,T * out )
+    {
+    for ( int j_2 = 0 ; j_2 < dim_j_2; ++j_2 )
+        {
+        for ( int i_1 = 0 ; i_1 < dim_i_1; ++i_1 )
+            {
+            out[ j_2+i_1*dim_j_2]=T();
+            for ( int inner = 0 ; inner < dim_j_1; ++inner )
+                {
+                out[ j_2+i_1*dim_j_2]+= in_1[i_1*dim_j_1+inner]*in_2[j_2+inner*dim_j_2];
+                }
+            }
+        }
+    }
+
+
+
 void
 matrix_scalar_mult (
     std::complex < double >*cmat,
@@ -1898,16 +1562,24 @@ matrix_scalar_mult (
     int size )
     {
 
-    for ( int i = 0; i < size; ++i )
+    for ( int i = 0; i < size*size; ++i )
         {
+        cmat[i] = cmat[i] * factor;
+        }
 
-        for ( int j = 0; j < size; ++j )
-            {
+    }
 
-            cmat[i * size + j] = cmat[i * size + j] * factor;
+void
+matrix_scalar_mult (
+    std::complex < double >*cmat,
+    std::complex < double >*out,
+    std::complex < double > factor,
+    int size )
+    {
 
-            }
-
+    for ( int i = 0; i < size*size; ++i )
+        {
+        out[i] = cmat[i] * factor;
         }
 
     }
@@ -1919,18 +1591,10 @@ matrix_scalar_mult (
     int size )
     {
 
-    for ( int i = 0; i < size; ++i )
+    for ( int i = 0; i < size*size; ++i )
         {
-
-        for ( int j = 0; j < size; ++j )
-            {
-
-            cmat[i * size + j] = cmat[i * size + j] * factor;
-
-            }
-
+        cmat[i] = cmat[i] * factor;
         }
-
     }
 
 void
@@ -1940,16 +1604,9 @@ matrix_copy (
     int size )
     {
 
-    for ( int i = 0; i < size; ++i )
+    for ( int i = 0; i < size*size; ++i )
         {
-
-        for ( int j = 0; j < size; ++j )
-            {
-
-            copy[i * size + j] = cmat[i * size + j];
-
-            }
-
+        copy[i] = cmat[i];
         }
 
     }
@@ -1969,7 +1626,7 @@ vector_copy (
 
     }
 
-    
+
 
 void
 vector_scalar_mult (
@@ -2082,29 +1739,6 @@ vector_norm (
 
     }
 
-void
-state_get_projector (
-    std::complex < double >*unitary,
-    int nr,
-    std::complex < double >*out,
-    int size )
-    {
-
-    for ( int i = 0; i < size; ++i )
-        {
-
-        for ( int j = 0; j < size; ++j )
-            {
-
-            out[j + i * size] =
-                unitary[i * size + nr] * std::conj ( unitary[j * size + nr] );
-
-            }
-
-        }
-
-    }
-
 double
 state_v_n_entropy (
     const std::complex < double > * const cmat,
@@ -2134,7 +1768,7 @@ state_v_n_entropy (
         else if ( eigen[i].real () < 0 )
             {
 
-            std::cout << " ERROR: DENSITY MATRIX HAS NEGATIVE EIGENVALUES ";
+            std::cout << " ERROR: DENSITY MATRIX HAS NEGATIVE EIGENVALUES: " << eigen[i] << std::endl;
             return -1;
 
             }
@@ -2179,8 +1813,8 @@ state_v_n_entropy (
     return -result;
 
     }
-    
-    
+
+
 
 double
 state_rel_entropy (
@@ -2307,13 +1941,16 @@ state_negativity (
     std::complex < double >*cmat_buff,
     std::complex < double >*buff,
     int * subspaces,
+    int nr_of_subspaces,// 2 by 3 would be {2,3}
     int size )
     {
+    state_partial_transpose_nxn ( cmat,cmat_buff,size, subspaces, nr_of_subspaces );
 
-    state_partial_transpose_nxn ( cmat,cmat_buff,size, subspaces, 2 );
+    //matrix_show(cmat_buff,4);
 
     double result = 0.0;
     matrix_eigenvalues ( cmat_buff, buff, size );
+
 
     for ( int i = 0; i < size; ++i )
         {
@@ -2335,6 +1972,7 @@ double
 state_negativity (
     std::complex < double >*cmat,
     int * subspaces,
+    int nr_of_subspaces,
     int size )
     {
     double result;
@@ -2345,70 +1983,78 @@ state_negativity (
     std::complex < double >*eigen;
     eigen = new std::complex < double >[size];
 
-    result = state_negativity ( cmat, cmat_buff, eigen, subspaces, size );
+    result = state_negativity ( cmat, cmat_buff, eigen, subspaces, nr_of_subspaces, size );
 
     delete[]eigen;
+    delete[] cmat_buff;
 
     return result;
 
     }
 
-void
-vector_tensor_prod (
-    std::complex < double >*in1,
-    int dim_in1,
-    std::complex < double >*in2,
-    int dim_in2,
-    std::complex < double >*out,
-    int dim_out )
+double
+state_logarithmic_negativity (
+    std::complex < double >*cmat,
+    int * subspaces,
+    int nr_of_subspaces,
+    int size )
     {
+    double result;
 
-    if ( dim_in1 * dim_in2 != dim_out )
-        {
+    std::complex < double >*cmat_buff1 = new std::complex < double >[size*size];
+    std::complex < double >*cmat_buff2 = new std::complex < double >[size*size];
 
-        std::cout << "Error in funtion VECTOR_TENSOR_PROD: dimension Mismatch";
-        return;
+    state_partial_transpose_nxn ( cmat,cmat_buff1,size, subspaces, nr_of_subspaces );
 
-        }
+    cblas_zgemm ( CblasRowMajor,CblasConjTrans,CblasNoTrans,size,size,size,_1_,cmat_buff1,size,cmat_buff1,size,_0_,cmat_buff2,size );
 
-    for ( int i = 0; i < dim_in1; ++i )
-        {
+    matrix_square_root ( cmat_buff2,cmat_buff1,size );
 
-        for ( int j = 0; j < dim_in2; ++j )
-            {
+    result = log2 ( matrix_trace_nxn ( cmat_buff1,size ).real() );
 
-            out[i * dim_in2 + j] = in1[i] * in2[j];
+    delete[] cmat_buff1;
+    delete[] cmat_buff2;
+    return result;
 
-            }
-
-        }
 
     }
 
+
 double
-state_hs_norm (
+state_hs_norm_herm (
     std::complex < double >*in,
     int size )
     {
 
-    std::complex < double >norm = std::complex < double > (
-                                      0, 0 );
+    std::complex < double > result ( 0 );
 
-    for ( int i = 0; i < size; ++i )
+    for ( int i = 0; i < size*size; ++i )
         {
-
-        for ( int j = 0; j < size; ++j )
-            {
-
-            norm += in[j + i * size] * std::conj ( in[j + i * size] );
-
-            }
-
+        result +=   in[i]*std::conj ( in[i] );
         }
-
-    return sqrt ( norm.real () );
-
+    return sqrt ( result.real() );
     }
+
+double state_hilbert_schmidt_distance (
+    std::complex < double > * in1,
+    std::complex < double > * in2,
+    int size )
+    {
+
+    std::complex< double > * temp1 = new std::complex< double >[size*size];
+    std::complex< double > * temp2 = new std::complex< double >[size*size];
+
+    matrix_add ( in1,in2,-1.0,temp1,size );
+    matrix_mlt ( temp1,temp1,temp2,size );
+
+    double result = sqrt ( matrix_trace_nxn ( temp2,size ).real() );
+    delete[] temp1;
+    delete[] temp2;
+    return result;
+
+    };
+
+
 
 bool
 compare_real_part (
@@ -2446,20 +2092,17 @@ state_purity (
     int size )
     {
 
-    std::complex < double >purity = std::complex < double > (
-                                        0, 0 );
+    std::complex < double > * temp = new std::complex < double >[size*size];
 
-    for ( int i = 0; i < size; ++i )
-        {
+    std::complex < double >purity = std::complex < double > ( 0, 0 );
 
-        for ( int j = 0; j < size; ++j )
-            {
+    matrix_mlt ( cmat,cmat,temp,size );
 
-            purity += cmat[j + i * size] * cmat[i + j * size];
-            }
-        }
+    purity = matrix_trace_nxn ( temp,size );
 
-    return purity.real ();
+    delete[] temp;
+    return purity.real();
+
     }
 
 std::complex < double >
@@ -2644,9 +2287,8 @@ matrix_partial_cross_transpose (
                     for ( int l = 0; l < dim_b; ++l )
                         {
 
-                        out[ ( i * dim_b + j ) * size + k * dim_b + l] =
-                            in[ ( i * dim_b + k ) * size + j * dim_b + l];
-                        //std::cout << (i*dim_b+k)*size+j*dim_b+l << '\t' << (i*dim_b+j)*size+k*dim_b+l << std::endl;
+                        out[ ( i * dim_a + j ) * dim_b*dim_b + k * dim_b + l] =
+                            in[ ( i * dim_b + k ) * size        + j * dim_b + l];
 
                         }
 
@@ -2663,7 +2305,6 @@ matrix_partial_cross_transpose (
 
         std::cout <<
                   "ERROR in function: matrix_partial_cross_transpose: INCOMPATIBLE DIMENSIONS";
-
         }
 
     }
@@ -2682,6 +2323,7 @@ matrix_square_root (
 
     LAPACKE_zheevd ( LAPACK_ROW_MAJOR, 'V', 'U', size, in_copy, size,
                      eigen_dvec );
+    //vector_show(eigen_dvec,size);
 
     vector_cutoff_neg ( eigen_dvec, size );
 
@@ -2703,9 +2345,11 @@ matrix_square_root (
             }
         }
 
-    matrix_hermitian_conjugate ( in_copy, size );
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasConjTrans,size,size,size,_1_,temp,size,in_copy,size,_0_,out,size );
 
-    matrix_mlt ( temp, in_copy, out, size );
+    // matrix_hermitian_conjugate ( in_copy, size );
+
+    // matrix_mlt ( temp, in_copy, out, size );
 
     }
 
@@ -2736,7 +2380,8 @@ matrix_log_nat_hermitian ( const std::complex< double > * in ,
             }
         else if ( eigen_temp[i] < 0 )
             {
-            std::cout <<  "Matrix log Error: Negative Eigenvalues" <<  std::endl;
+            std::cout <<  "Error Matrix_log_nat_herm: Negative Eigenvalues" <<  std::endl;
+            vector_show ( eigen_temp,size );
             return;
             }
         else if ( eigen_temp == 0 )
@@ -2811,7 +2456,8 @@ matrix_log_2_hermitian ( const std::complex< double > * in ,
             }
         else if ( eigen_temp[i] < 0 )
             {
-            std::cout <<  "Matrix log Error: Negative Eigenvalues" <<  std::endl;
+            std::cout <<  "Matrix matrix_log_2_hermitian: Negative Eigenvalues" <<  std::endl;
+            vector_show ( eigen_out,size );
             return;
             }
         else if ( eigen_temp == 0 )
@@ -2860,7 +2506,7 @@ matrix_log_2_hermitian ( std::complex< double > * in ,
     }
 
 void
-matrix_square_root_hermitian (
+matrix_square_root (
     std::complex < double >*in,
     std::complex < double >*out,
     int size )
@@ -2887,37 +2533,36 @@ state_quantum_commutance (
     std::complex < double >*in,
     int dim_a,
     int dim_b,
-    int dim_max,
-    int dim_max_mat,
     int size,
     std::complex < double >*temp_cmat_1,
     std::complex < double >*temp_cmat_2,
     std::complex < double >*temp_cmat_3,
     double *temp_dvec,
-    std::complex < double >*temp_cvec,
     std::complex < double >*X )
     {
-    matrix_partial_cross_transpose ( in, temp_cmat_1, dim_a, dim_b, size );	// calculate R
+    int dim_a2 = dim_a*dim_a;
 
-    matrix_hermitian_conjugate ( temp_cmat_1, temp_cmat_2, dim_max_mat );	// calculate R^H
+    matrix_partial_cross_transpose ( in, temp_cmat_1, dim_a, dim_b, size );	// calculate R has dimension
 
-    matrix_mlt ( temp_cmat_1, temp_cmat_2, temp_cmat_3, dim_max_mat );	// calculate R*R^H
+    matrix_hermitian_conjugate ( temp_cmat_1, temp_cmat_2, dim_a2, dim_b*dim_b );	// calculate R^H <-------ADAPT TO RECTANGULAR
 
-    matrix_square_root ( temp_cmat_3, temp_cmat_1, temp_cmat_2, X, temp_dvec, dim_max_mat );	// calculate X = sqrt(R*R^H)
+    matrix_multiplication ( temp_cmat_1,dim_a2,dim_b*dim_b, temp_cmat_2,dim_b*dim_b, dim_a2, temp_cmat_3 );	// calculate R*R^H  <-------ADAPT TO RECTANGULAR
 
-    matrix_partial_cross_transpose ( X, temp_cmat_1, dim_max, dim_max, dim_max_mat );	// calculate X^<
+    matrix_square_root ( temp_cmat_3, temp_cmat_1, temp_cmat_2, X, temp_dvec,dim_a2 );	// calculate X = sqrt(R*R^H)
 
-    matrix_mlt ( temp_cmat_1, temp_cmat_1, temp_cmat_2, dim_max_mat );	//calculate X^< * X^<
+    matrix_partial_cross_transpose ( X, temp_cmat_1, dim_a, dim_a, dim_a2 );	// calculate X^<
 
-    matrix_partial_cross_transpose ( temp_cmat_2, temp_cmat_3, dim_max, dim_max,
-                                     dim_max_mat );
+    matrix_mlt ( temp_cmat_1, temp_cmat_1, temp_cmat_2,dim_a2 );	//calculate X^< * X^<
 
-    matrix_mlt ( temp_cmat_1, X, temp_cmat_2, dim_max_mat );
+    matrix_partial_cross_transpose ( temp_cmat_2, temp_cmat_3, dim_a, dim_a,
+                                     dim_a2 );
 
-    matrix_sub ( temp_cmat_3, temp_cmat_2, dim_max_mat );
+    matrix_mlt ( temp_cmat_1, X, temp_cmat_2, dim_a2 );
+
+    matrix_sub ( temp_cmat_3, temp_cmat_2, dim_a2 );
 
 
-    return matrix_trace_nxn ( temp_cmat_3, dim_max_mat ).real ();
+    return matrix_trace_nxn ( temp_cmat_3,dim_a2 ).real ();
     }
 
 double
@@ -2941,61 +2586,25 @@ state_quantum_commutance (
     int dim_mat_max = dim_max * dim_max;
     int dim_mat_max_global = dim_max * dim_max * dim_max * dim_max;
 
-    std::complex < double >*temp_cmat_1 =
-        new std::complex < double >[dim_mat_max_global];
-    std::complex < double >*temp_cmat_2 =
-        new std::complex < double >[dim_mat_max_global];
-    std::complex < double >*temp_cmat_3 =
-        new std::complex < double >[dim_mat_max_global];
-    double *temp_dvec =
-        new double[dim_mat_max];
-    std::complex < double >*temp_cvec =
-        new std::complex < double >[dim_mat_max];
+    std::complex < double >*temp_cmat_1 = new std::complex < double >[dim_mat_max_global];
+    std::complex < double >*temp_cmat_2 = new std::complex < double >[dim_mat_max_global];
+    std::complex < double >*temp_cmat_3 = new std::complex < double >[dim_mat_max_global];
+
+    double *temp_dvec = new double[dim_mat_max];
     std::complex < double >*X = new std::complex < double >[dim_mat_max_global];
 
     double result =
-        state_quantum_commutance ( in, dim_a, dim_b, dim_max, dim_mat_max, size,
+        state_quantum_commutance ( in, dim_a, dim_b,size,
                                    temp_cmat_1, temp_cmat_2, temp_cmat_3,
-                                   temp_dvec, temp_cvec, X );
+                                   temp_dvec,X );
 
     delete[]temp_cmat_1;
     delete[]temp_cmat_2;
     delete[]temp_cmat_3;
     delete[]temp_dvec;
-    delete[]temp_cvec;
     delete[]X;
 
     return result;
-    }
-
-
-double
-state_Mutual_information_I_A_B ( const std::complex< double > *  const rho_AB,
-                                 int size_A,
-                                 int size_B,
-                                 int size_AB )
-    {
-    double S_A ( 0 ),S_B ( 0 ),S_AB ( 0 ),S_A_w_B ( 0 );
-
-    std::complex< double > * rho_A = new std::complex< double > [size_A*size_A];
-    std::complex< double > * rho_B = new std::complex< double > [size_B*size_B];
-
-    int tr_out_a[2] = {-size_A,size_B};
-    int tr_out_b[2] = {size_A,-size_B};
-
-
-    matrix_partial_trace ( rho_AB,rho_A,tr_out_a,2,size_AB );
-    matrix_partial_trace ( rho_AB,rho_B,tr_out_b,2,size_AB );
-
-    S_A= state_v_n_entropy ( rho_A,size_A );
-    S_B= state_v_n_entropy ( rho_B,size_B );
-    S_AB= state_v_n_entropy ( rho_AB,size_AB );
-
-    delete[] rho_A;
-    delete[] rho_B;
-
-    return S_A+S_B-S_AB;
-
     }
 
 
@@ -3039,8 +2648,8 @@ void matrix_partial_trace ( const std::complex< double > * in,
     int ind = 0;
 
     std::complex< double > temp;
-    std::complex< double > * buffer = new std::complex< double >[size_tot*size_tot];
-    std::complex< double > * buffer2 = new std::complex< double >[size_tot*size_tot];
+    std::complex< double > * buffer = new std::complex< double >[size_tot*size_tot]();
+    std::complex< double > * buffer2 = new std::complex< double >[size_tot*size_tot]();
 
     matrix_copy ( in,buffer,size_tot );
 
@@ -3048,7 +2657,7 @@ void matrix_partial_trace ( const std::complex< double > * in,
         {
         sub_block_size /= trace_vector[subspace];
 
-        if ( trace_vector[subspace] <0 )
+        if ( trace_vector[subspace] < 0 )
             {
             sub_block_size=-sub_block_size;
             out_size /=-trace_vector[subspace];
@@ -3062,8 +2671,8 @@ void matrix_partial_trace ( const std::complex< double > * in,
                         {
                         for ( int in_block_i = 0 ; in_block_i < sub_block_size ; ++in_block_i )
                             {
-                            temp=std::complex< double > ( 0,0 );
-                            ind = in_block_i+block_i*block_size+ ( in_block_j +  block_j*block_size ) *temp_size;
+                            temp = std::complex< double > ( 0.0,0.0 );
+                            ind  = in_block_i+block_i*block_size+ ( in_block_j +  block_j*block_size ) *temp_size;
                             for ( int sum_i=0; sum_i< -trace_vector[subspace]; ++sum_i )
                                 {
                                 temp +=buffer[ind + sum_i*sub_block_size* ( temp_size+1 )];
@@ -3087,25 +2696,333 @@ void matrix_partial_trace ( const std::complex< double > * in,
     delete[] buffer2;
     }
 
+double state_relative_entropy_of_coherence ( std::complex< double > * in, int size )
+    {
+    std::complex< double > * in_diag = new std::complex< double >[size*size];
+    matrix_initialize_zero ( in_diag,size );
 
+    for ( int i = 0; i < size ; ++i )
+        {
+        in_diag[i* ( size+1 )]=in[i* ( size+1 )];
+        }
+
+    double result = state_v_n_entropy ( in_diag,size )-state_v_n_entropy ( in,size );
+    delete[] in_diag;
+    return result;
+    }
+
+void state_trivial_expand ( std::complex< double > * in, std::complex< double > * out,int klein, int gross )
+
+    {
+    matrix_initialize_zero ( out,gross );
+
+    for ( int i = 0; i < klein; ++i )
+        {
+        for ( int j = 0; j < klein; ++j )
+            {
+
+            out[i+j*gross]=in[i+j*klein];
+
+            }
+
+        }
+    }
+double trace_distance ( const std::complex< double > * in1 , std::complex< double > * in2, int size )
+    {
+    std::complex< double > * temp  = new std::complex< double > [size*size];
+    std::complex< double > * eigen = new std::complex< double > [size];
+    for ( int i = 0 ; i < size*size; ++i )
+        {
+        temp[i] = in1[i]-in2[i];
+        }
+    matrix_eigenvalues ( temp,eigen,size );
+
+    double result ( 0 );
+
+    for ( int i = 0 ; i < size; ++i )
+        {
+        result += std::abs ( eigen[i].real() );
+        }
+    delete[] temp;
+    delete[] eigen;
+
+    return 0.5*result;
+
+
+    }
+
+////////-----------------------------------------------------schrott !!! muss noch verallgemeinert werden ...
+void
+state_bit_flip (
+    const std::complex < double >* in,
+    std::complex < double >*out,
+    double p,
+    int size )
+    {
+
+    std::complex< double > * temp1 = new std::complex< double >[8*8];
+    std::complex< double > * temp2 = new std::complex< double >[8*8];
+
+    std::complex< double > E_0 [2*2] = { _1*sqrt ( 1-p ), _0,
+                                         _0, _1*sqrt ( 1-p )
+                                       };
+
+    std::complex< double > E_1 [2*2] = {_0,_1*sqrt ( p ),
+                                        _1*sqrt ( p ),_0
+                                       };
+
+    std::complex< double >  R [4*4];
+
+    matrix_initialize_unity ( R,4 );
+//matrix_show(E_0,2);
+//matrix_show(E_1,2);
+
+    matrix_tensor_prod ( R,4,E_0,2,temp1,8 );
+    //matrix_show(temp1,8);
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasNoTrans,size,size,size,_1_,temp1,size,in,size,_0_,temp2,size );
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasConjTrans,size,size,size,_1_,temp2,size,temp1,size,_0_,out,size );
+
+    matrix_tensor_prod ( R,4,E_1,2,temp1,8 );
+    //matrix_show(temp1,8);
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasNoTrans,size,size,size,_1_,temp1,size,in,size,_0_,temp2,size );
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasConjTrans,size,size,size,_1_,temp2,size,temp1,size,_1_,out,size );
+
+    //matrix_show(out,8);
+
+    }
+
+void
+state_amp_damp (
+    const std::complex < double >* in,
+    std::complex < double >*out,
+    double p,
+    int size )
+    {
+
+    std::complex< double > * temp1 = new std::complex< double >[8*8];
+    std::complex< double > * temp2 = new std::complex< double >[8*8];
+
+    std::complex< double > E_0 [2*2] = { _0, _1* sqrt ( p ),
+                                         _0,        _0
+                                       };
+
+    std::complex< double > E_1 [2*2] = {_1,_0,
+                                        _0,_1*sqrt ( 1-p )
+                                       };
+
+    std::complex< double >  R [4*4];
+
+    matrix_initialize_unity ( R,4 );
+//matrix_show(E_0,2);
+//matrix_show(E_1,2);
+
+    matrix_tensor_prod ( R,4,E_0,2,temp1,8 );
+    //matrix_show(temp1,8);
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasNoTrans,size,size,size,_1_,temp1,size,in,size,_0_,temp2,size );
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasConjTrans,size,size,size,_1_,temp2,size,temp1,size,_0_,out,size );
+
+    matrix_tensor_prod ( R,4,E_1,2,temp1,8 );
+    //matrix_show(temp1,8);
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasNoTrans,size,size,size,_1_,temp1,size,in,size,_0_,temp2,size );
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasConjTrans,size,size,size,_1_,temp2,size,temp1,size,_1_,out,size );
+
+    //matrix_show(out,8);
+
+    }
+void
+state_amp_damp_bob (
+    const std::complex < double >* in,
+    std::complex < double >*out,
+    double p,
+    int size )
+    {
+    std::complex< double > * temp = new std::complex< double >[8*8];
+    std::complex< double > * temp1 = new std::complex< double >[8*8];
+    std::complex< double > * temp2 = new std::complex< double >[8*8];
+
+    std::complex< double > E_0 [2*2] = { _0, _1* sqrt ( p ),
+                                         _0,        _0
+                                       };
+
+    std::complex< double > E_1 [2*2] = {_1,_0,
+                                        _0,_1*sqrt ( 1-p )
+                                       };
+
+    std::complex< double >  R [2*2];
+
+    matrix_initialize_unity ( R,2 );
+//matrix_show(E_0,2);
+//matrix_show(E_1,2);
+
+    matrix_tensor_prod ( R,2,E_0,2,temp,4 );
+    matrix_tensor_prod ( temp,4,R,2,temp1,8 );
+    //matrix_show(temp1,8);
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasNoTrans,size,size,size,_1_,temp1,size,in,size,_0_,temp2,size );
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasConjTrans,size,size,size,_1_,temp2,size,temp1,size,_0_,out,size );
+
+    matrix_tensor_prod ( R,2,E_1,2,temp,4 );
+    matrix_tensor_prod ( temp,4,R,2,temp1,8 );
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasNoTrans,size,size,size,_1_,temp1,size,in,size,_0_,temp2,size );
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasConjTrans,size,size,size,_1_,temp2,size,temp1,size,_1_,out,size );
+
+    //matrix_show(out,8);
+    delete[] temp;
+    delete[]temp1;
+    delete[] temp2;
+
+    }
+
+void
+state_phase_damping (
+    const std::complex < double >* in,
+    std::complex < double >*out,
+    double p,
+    int size )
+    {
+
+    std::complex< double > * temp1 = new std::complex< double >[8*8];
+    std::complex< double > * temp2 = new std::complex< double >[8*8];
+
+    std::complex< double > E_0 [2*2] = { _1*sqrt ( p/2.0 ), _0,
+                                         _0, -_1*sqrt ( p/2.0 )
+                                       };
+
+    std::complex< double > E_1 [2*2] = {_1*sqrt ( 1- ( p/2.0 ) ),_0,
+                                        _0,_1*sqrt ( 1- ( p/2.0 ) )
+                                       };
+
+    std::complex< double >  R [4*4];
+
+    matrix_initialize_unity ( R,4 );
+//matrix_show(E_0,2);
+//matrix_show(E_1,2);
+
+    matrix_tensor_prod ( R,4,E_0,2,temp1,8 );
+    //matrix_show(temp1,8);
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasNoTrans,size,size,size,_1_,temp1,size,in,size,_0_,temp2,size );
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasConjTrans,size,size,size,_1_,temp2,size,temp1,size,_0_,out,size );
+
+    matrix_tensor_prod ( R,4,E_1,2,temp1,8 );
+    //matrix_show(temp1,8);
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasNoTrans,size,size,size,_1_,temp1,size,in,size,_0_,temp2,size );
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasConjTrans,size,size,size,_1_,temp2,size,temp1,size,_1_,out,size );
+
+    //matrix_show(out,8);
+    delete[] temp1;
+    delete[] temp2;
+
+    }
+
+void
+state_depolarizing (
+    const std::complex < double >* in,
+    std::complex < double >*out,
+    double p,
+    int size )
+    {
+
+    std::complex< double > * temp1 = new std::complex< double >[8*8];
+    std::complex< double > * temp2 = new std::complex< double >[8*8];
+
+    std::complex< double > E_0 [2*2] = { _1*sqrt ( 1- ( 3.0*p/4.0 ) ),                    _0,
+                                         _0, _1*sqrt ( 1- ( 3.0*p/4.0 ) )
+                                       };
+
+    std::complex< double > E_1 [2*2] = {_0,                   _1*sqrt ( p/4.0 ),
+                                        _1*sqrt ( p/4.0 )       ,_0
+                                       };
+
+    std::complex< double > E_2 [2*2] = { _0,                 -_i*sqrt ( p/4.0 ),
+                                         _i*sqrt ( p/4.0 )   ,_0
+                                       };
+
+    std::complex< double > E_3 [2*2] = {_1*sqrt ( p/4.0 ),_0,
+                                        _0,           -_1*sqrt ( p/4.0 )
+                                       };
+
+
+    std::complex< double >  R [4*4];
+
+    matrix_initialize_unity ( R,4 );
+//matrix_show(E_0,2);
+//matrix_show(E_1,2);
+
+    matrix_tensor_prod ( R,4,E_0,2,temp1,8 );
+    //matrix_show(temp1,8);
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasNoTrans,size,size,size,_1_,temp1,size,in,size,_0_,temp2,size );
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasConjTrans,size,size,size,_1_,temp2,size,temp1,size,_0_,out,size );
+
+    matrix_tensor_prod ( R,4,E_1,2,temp1,8 );
+    //matrix_show(temp1,8);
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasNoTrans,size,size,size,_1_,temp1,size,in,size,_0_,temp2,size );
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasConjTrans,size,size,size,_1_,temp2,size,temp1,size,_1_,out,size );
+
+    matrix_tensor_prod ( R,4,E_2,2,temp1,8 );
+    //matrix_show(temp1,8);
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasNoTrans,size,size,size,_1_,temp1,size,in,size,_0_,temp2,size );
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasConjTrans,size,size,size,_1_,temp2,size,temp1,size,_1_,out,size );
+
+    matrix_tensor_prod ( R,4,E_3,2,temp1,8 );
+    //matrix_show(temp1,8);
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasNoTrans,size,size,size,_1_,temp1,size,in,size,_0_,temp2,size );
+
+    cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasConjTrans,size,size,size,_1_,temp2,size,temp1,size,_1_,out,size );
+
+    //matrix_show(out,8);
+    delete[] temp1;
+    delete[] temp2;
+
+    }
     
-    
-    
-    
-    
-    template void vector_copy <int> (const int * vector,
-				     int *copy,
-				     int size );
-    
-    template void vector_copy <std::complex< double >> (const std::complex< double > * vector,
-							std::complex< double > *copy,
-							int size );
-    
-    template void vector_show <int> (int * vec ,
-				     int n);
-    template void vector_show <double> (double * vec ,
-				     int n);
-    
-    
-    
-    
+    //------------------------template declaration------------------
+
+template void vector_copy <int> ( const int * vector,
+                                  int *copy,
+                                  int size );
+
+template void vector_copy <std::complex< double >> ( const std::complex< double > * vector,
+        std::complex< double > *copy,
+        int size );
+
+template void vector_show <int> ( int * vec ,
+                                  int n );
+template void vector_show <double> ( double * vec ,
+                                     int n );
+
+template void matrix_multiplication <std::complex<double>> ( std::complex <double> * in_1,
+        int dim_i_1,
+        int dim_j_1,
+        std::complex <double> * in_2,
+        int dim_i_2,
+        int dim_j_2,
+        std::complex <double> * out );
+
+template void matrix_show <std::complex< double >> ( std::complex< double > * mat, int dim_i, int dim_j );
+
+
+
+
+

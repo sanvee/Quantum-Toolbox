@@ -1,33 +1,37 @@
 #ifndef __QUIT_TOOLBOX__
 #define __QUIT_TOOLBOX__
 
+
+#include <regex>
 #include <iostream>
 #include <fstream>
+#include <string>
 #include <math.h>
+#include <iterator>
 #include <algorithm>
-#include <gsl/gsl_math.h>
-#include <gsl/gsl_matrix.h>
-#include <gsl/gsl_permutation.h>
-#include <gsl/gsl_vector.h>
-#include <vector>
-#include <gsl/gsl_complex.h>
 #include <complex>
-#include <gsl/gsl_complex_math.h>
-#include "qr_complex.h"
-#include <gsl/gsl_linalg.h>
+
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_randist.h>
+
 #define HAVE_LAPACK_CONFIG_H
 #define LAPACK_COMPLEX_CPP
+
 #include <openblas/lapacke_config.h>
 #include <openblas/lapacke_utils.h>
 #include <openblas/lapacke.h>
+#include <openblas/openblas_config.h>
+#include <cblas.h>
+
+
 
 extern std::complex< double > _0;
 extern std::complex< double > _1;
 extern std::complex< double > _neg_1;
 extern std::complex< double > _i;
 extern std::complex< double > _neg_i;
+extern double _0_[];
+extern double _1_[]; 
 
 extern gsl_rng * _R_G;
 
@@ -71,7 +75,6 @@ void sphere_3_rand ( double vec[3] );
 
 void sample_from_complex_sphere_n_rand ( std::complex< double > * vec, int size );
 
-void sample_uniform_2_sphere_rad_sqrt_r ( gsl_complex * z );
 
 void sample_uniform_2_unit_sphere ( double arr[2] );
 
@@ -83,9 +86,6 @@ void sample_random_ginibre_matrix ( double * mat,
 
 void sample_uniform_n_simplex ( std::complex< double >* carr,
                                 int size );
-
-void sample_uniform_n_simplex2 ( std::complex< double > * carr,
-                                 int size );
 
 //---------------------------------------------------------------------------------
 
@@ -104,29 +104,20 @@ void sample_density_matrix_up ( std::complex< double >* out,
 void sample_density_matrix_up ( std::complex< double >* out,
                                 int size );
 
-void sample_separable_density_matrix_hs ( std::complex< double > * cmat,
-        int * sub_spaces,
-        int tot_nr_subspaces,
-        int size );
-
-void sample_separable_density_matrix_up ( std::complex< double > * cmat,
-        int * sub_spaces,
-        int tot_nr_subspaces,
-        int size );
-
 void sample_pure_density_matrix ( std::complex< double > * out,
                                   int size );
 
-void sample_separable_pure_density_matrix ( std::complex< double > * cmat,
-        int size,
-        int * sub_spaces,
-        int tot_nr_subspaces );
+void sample_pure_density_matrix2 ( std::complex < double >*out,
+                                   int size );
 
+
+void sample_separable_state( std::complex <double> * out,
+			     int nr_mixtures,
+			     int * subspaces,
+			     int nr_subspaces,
+			     int dim_tot );
 
 void sample_uniform_2x2_unitary_matrix ( std::complex< double > * cmat );
-
-
-void sample_uniform_2x2_unitary_matrix ( gsl_matrix * mat );
 
 
 int sample_unitary_matrix ( std::complex< double > * cmat,
@@ -141,13 +132,12 @@ void sample_diag_state ( std::complex< double > * cmat,
                          int size );
 
 
-
-void sample_pure_n_qudit_ket ( gsl_vector * arr );
-
-void sample_pure_n_qudit_ket ( gsl_vector_complex * carr );
-
 template < typename T >
 void vector_show (T * vec,int n );
+
+
+template < typename T >
+void matrix_multiplication (T * in_1, int dim_i_1, int dim_j_1, T * in_2, int dim_i_2 , int dim_j_2 ,T * out);
 
 
 void vector_write_to_file ( double * vec,
@@ -160,6 +150,10 @@ void vector_show ( std::complex< double > * cvec,
 
 void matrix_show ( std::complex<double> * cmat,
                    int n );
+
+template < typename T >
+    void
+matrix_show (T * mat,int dim_i, int dim_j );
 
 void matrix_show_real_part ( std::complex<double> * cmat,
                              int n );
@@ -182,6 +176,12 @@ void matrix_transpose ( std::complex< double > * in,
 void matrix_hermitian_conjugate ( std::complex< double > * in,
                                   std::complex< double > * out
                                   ,int dim );
+
+void matrix_hermitian_conjugate (std::complex < double > * in,
+				 std::complex < double > * out,
+				 int dim_i, 
+				 int dim_j );
+ 
 void matrix_hermitian_conjugate ( std::complex< double > * in ,
                                   int dim );
 
@@ -200,22 +200,15 @@ void transpose_block_mxm_at_offset_in_nxn ( double  * in,
         int dim_sub );
 
 void matrix_get_column ( int col, const std::complex< double >*const cmat, std::complex< double >* out, int size );
-void matrix_get_partial_column (
-    int col,
-    int col_lenght,
-    std::complex < double >*cmat,
-    std::complex < double >*out,
-    int size );
-    void
-matrix_set_partial_column (
-    int col,
-    int col_lenght,
-    std::complex < double >*cvec,
-    std::complex < double >*out,
-    int size );
 
 
-void matrix_partial_trace ( const std::complex< double >* in, std::complex< double >* out, int* trace_vector, int nr_subspaces, int size_tot );
+
+
+void matrix_partial_trace ( const std::complex< double >* in,
+			    std::complex< double >* out,
+			    int* trace_vector,
+			    int nr_subspaces, 
+			    int size_tot );
 
 
 
@@ -234,11 +227,11 @@ void flip_block_kxk_in_block_mxm_in_nxn ( double * in,
         int k,
         int m );
 
-void state_partial_transpose_nxn ( std::complex< double > * in,
-                                   std::complex< double > * out,
-                                   int dim_in ,
-                                   int * transpose_vector,
-                                   int tot_nr_subspaces );
+void state_partial_transpose_nxn ( std::complex< double >* in,
+				   std::complex< double >* out,
+				   int dim_in,
+				   int* transpose_vector,
+				   int tot_nr_subspaces );
 
 void matrix_partial_cross_transpose ( std::complex< double > * in ,
                                       std::complex< double > * out,
@@ -286,7 +279,13 @@ void matrix_log_nat_hermitian ( const std::complex< double > * in ,
 				double * eigen_out,
                                 int size );
 
-void matrix_log_2_hermitian ( const std::complex< double >* in, std::complex< double >* in_copy, std::complex< double >* temp, std::complex< double >* out, double* eigen_temp, double* eigen_out, int size );
+void matrix_log_2_hermitian ( const std::complex< double >* in,
+			      std::complex< double >* in_copy,
+			      std::complex< double >* temp,
+			      std::complex< double >* out,
+			      double* eigen_temp,
+			      double* eigen_out,
+			      int size );
 
 void matrix_log_nat_hermitian ( std::complex< double > * in ,
                                 std::complex< double > * out,
@@ -321,16 +320,8 @@ void matrix_tensor_prod ( std::complex< double > * in1,
                           std::complex< double > * out,
                           int dim_out );
 
-void matrix_tensor_prod ( double * in1,
-                          int dim_in1,
-                          double * in2,
-                          int dim_in2,
-                          double * out,
-                          int dim_out );
 
-void matrix_add ( std::complex< double > * cmat1,
-                  std::complex< double > * cmat2,
-                  int size );
+void matrix_add ( std::complex< double >* cmat1, std::complex< double >* cmat2, double factor, std::complex< double >* out, int size );
 
 void matrix_sub ( std::complex< double > * cmat1,
                   std::complex< double > * cmat2,
@@ -338,7 +329,7 @@ void matrix_sub ( std::complex< double > * cmat1,
 
 void matrix_add_to_first ( std::complex< double >* cmat1,
                            std::complex< double >* cmat2,
-                           double factor,
+                           std::complex < double > factor,
                            int size );
 
 void matrix_normalize ( std::complex< double > * cmat,
@@ -357,14 +348,23 @@ void vector_add_to_first ( std::complex< double > * cvec1,
                            double factor,
                            int size );
 
-void matrix_mlt ( const std::complex< double > * cmat1,
-                  const std::complex< double > * cmat2,
-                  std::complex< double > * out,
-                  int size );
+void matrix_mlt ( const std::complex< double >* cmat1,
+		  const std::complex< double >* cmat2,
+		  std::complex< double >* out, int size );
+
+void matrix_mlt2 ( std::complex< double >* cmat1,
+		   std::complex< double >* cmat2,
+		   std::complex< double >* out,
+		   int size );
 
 void matrix_scalar_mult ( std::complex< double > * cmat,
                           double factor,
                           int size );
+
+void matrix_scalar_mult (std::complex < double > * cmat,
+		    std::complex < double > *out,
+		    std::complex < double > factor,
+		    int size );
 
 void matrix_scalar_mult ( std::complex< double > * cmat,
                           std::complex< double > factor,
@@ -422,7 +422,7 @@ void matrix_eigenvalues ( const std::complex< double >*const cmat, std::complex<
  * CALCULATIONS (level Quantum)
  *------------------------------------------------------------------------------ -*/
 
-double state_hs_norm ( std::complex< double >* in,
+double state_hs_norm_herm ( std::complex< double >* in,
                        int size );
 
 double state_purity ( std::complex< double >* cmat,
@@ -462,11 +462,20 @@ double state_negativity ( std::complex< double > * cmat,
                           std::complex< double > * cmat_buff,
                           std::complex< double > * buff,
                           int * subspaces,
+			  int nr_of_subspaces,
                           int size );
 
-double state_negativity ( std::complex< double > * cmat,
-                          int * subspaces,
-                          int size );
+double state_negativity ( std::complex< double >* cmat,
+			  int* subspaces, 
+			  int nr_of_subspaces,
+			  int size );
+double state_logarithmic_negativity (
+    std::complex < double >*cmat,
+    int * subspaces,
+    int nr_of_subspaces,
+    int size );
+
+
 
 void state_decohere_on_subspace_ran ( std::complex< double >* in,
                                   std::complex< double >* out,
@@ -506,26 +515,30 @@ void state_decohere_on_subspace ( const std::complex< double >* const in,
 double state_quantum_commutance ( std::complex< double > * in,
                                   int dim_a,
                                   int dim_b,
-                                  int dim_max,
-                                  int dim_mat_max,
                                   int size,
                                   std::complex< double > * temp_cmat_1,
                                   std::complex< double > * temp_cmat_2,
                                   std::complex< double > * temp_cmat_3,
                                   double   * temp_dvec,
-                                  std::complex< double > * temp_cvec,
                                   std::complex< double > * X );
 
 double state_quantum_commutance ( std::complex< double > * in,
                                   int dim_a,
                                   int dim_b,
                                   int size );
-double
-state_Mutual_information_I_A_B ( const std::complex< double > *  const rho_AB,
-                        int size_A,
-                        int size_B,
-                        int size_AB );
 
+double state_relative_entropy_of_coherence( std::complex< double > * in,
+					    int size);
+
+void state_trivial_expand ( std::complex< double > * in,
+			    std::complex< double > * out,
+			    int klein,
+			    int gross );
+double trace_distance(const  std::complex< double > * in1,
+				       std::complex< double > * in2,
+				       int size);
+double state_hilbert_schmidt_distance (
+    std::complex< double >* in1, std::complex< double >* in2, int size );
 
 
 
@@ -533,5 +546,38 @@ state_Mutual_information_I_A_B ( const std::complex< double > *  const rho_AB,
 /*-----------------------------------------------------------------------------------
  * ----------------------------------------------------------------------------------
  */
+
+
+void state_amp_damp (
+    const std::complex < double >* in,
+    std::complex < double >*out,
+    double p,
+    int size);
+
+void state_amp_damp_bob (
+    const std::complex < double >* in,
+    std::complex < double >*out,
+    double p,
+    int size);
+
+void state_phase_damping (
+    const std::complex < double >* in,
+    std::complex < double >*out,
+    double p,
+    int size);
+
+void
+state_bit_flip (
+    const std::complex < double >* in,
+    std::complex < double >*out,
+    double p,
+    int size);
+
+        void
+state_depolarizing (
+    const std::complex < double >* in,
+    std::complex < double >*out,
+    double p,
+    int size);
 
 #endif  // __QUIT_TOOLBOX__

@@ -1,0 +1,305 @@
+for ( int f = 2 ; f < 9 ; f++ )
+        {
+        for ( int b = 2 ; b <= f ; ++b )
+            {
+	      
+            std::ofstream DUMP;
+            char filename[20]= {};
+            sprintf ( filename,"../QD_RE_QC_%d_%d_%d_2.txt",f,b,f*b*2 );
+            DUMP.open ( filename );
+	
+            std::cout << f << '\t' << b << std::endl;
+            int spaces[3] = {f,b,-2};
+	
+            unitary_jarlskog U2 ( 2 );
+
+            for ( int i = 0; i < 100000 ; ++i )
+                {
+
+                sample_separable_state ( sep_state1,2,spaces,3,f*b*2 );
+                DUMP << state_quantum_discord_qubit_ancilla ( sep_state1,U2,dec_state1,spaces,3,f*b*2 ) << '\t'
+                     << state_relative_entropy_of_discord_qubit_ancilla ( sep_state1,U2,dec_state1,spaces,3,f*b*2 ) << '\t'
+                     << state_quantum_commutance ( sep_state1,f*b,2,f*b*2 ) << std::endl;
+                }
+
+            DUMP.close();
+            }
+            
+            param_state_multipartite_mixed A_BC (2,a_bc,8);
+    param_state_multipartite_mixed A_B_C (3,a_b_c,8);
+    
+    sample_separable_state(AB_C,8,ab_c,2,8);
+    
+    
+    cout << state_relative_entropy_of_discord_qubit_ancilla(AB_C,U2,dec_state1,ab_c,2,8,1000) << endl; 
+    
+    cout << relative_entropy_of_entanglement(AB_C,A_BC,10)<<endl;
+    cout << relative_entropy_of_entanglement(AB_C,A_B_C,10)<<endl;
+    } 
+                
+
+ for ( int i = 0; i < 1000000 ; ++i )
+            {
+            sample_separable_state ( A_BC , 8 , a_bc , 2 ,8 );
+            sample_separable_state ( A_B_C, 8 , a_b_c, 3 ,8 );
+ 
+            temp = state_rel_entropy ( AB_C,A_BC,8 );
+            if ( temp < res1 )
+                {
+                res1=temp;
+                }
+            temp = state_rel_entropy ( AB_C,A_B_C,8 );
+            if ( temp < res2 )
+                {
+                res2=temp;
+                }
+
+            temp = state_hilbert_schmidt_distance ( AB_C,A_BC,8 );
+            if ( temp < hs1 )
+                {
+                hs1=temp;
+                }
+            temp = state_hilbert_schmidt_distance ( AB_C,A_B_C,8 );
+            if ( temp < hs2 )
+                {
+                hs2=temp;
+                std::cout<< i << '\t'  << hs2 <<std::endl;
+                }
+
+
+
+
+    /*
+        std::complex< double > m1[2*2] = {1,2,
+                                          3,4
+                                         };
+
+        matrix_show ( m1,2,2 );
+
+        std::complex< double > m2[3*3]= {5,6,0,
+                                         8,9,0,
+                                         0,0,0
+                                        };
+        std::complex< double > result[6*6]= {};
+        std::complex< double > result2[4*9]= {};
+        std::complex< double > result3[4*4]= {};
+                                             ;
+        matrix_tensor_prod ( m1,2,m2,3,result,6 );
+        matrix_show(result,6);
+
+        matrix_partial_cross_transpose ( result,result2,2,3,6 );
+        matrix_show(result2,4,9);
+        matrix_hermitian_conjugate(result2,result,4,9);
+        matrix_multiplication(result,4,9,result2,9,4,result3);
+        matrix_show(result,4);*/
+
+
+    /*--------------random Angles -------------------------------------
+           int spaces[3] = {2,2,-2};
+
+    	for ( int i = 0; i < 10000; i++)
+    	{
+    	 mesurement.parameters[0]= 2*M_PI*gsl_rng_uniform(_R_G);
+    	 mesurement.parameters[1]= 2*M_PI*gsl_rng_uniform(_R_G);
+    	 mesurement.parameters[2]= 2*M_PI*gsl_rng_uniform(_R_G);
+    	 mesurement.parameters[3]= 2*M_PI*gsl_rng_uniform(_R_G);
+
+    	 mesurement.set_paramters();
+    	 mesurement.calculate_representation();
+
+    	 state_decohere_on_subspace(eta, result,mesurement.representation,8,spaces,3);
+
+    	TEXTFILE  << mesurement.parameters[0]<< "\t"<<  mesurement.parameters[1] << "\t"<< mesurement.parameters[2] << "\t"<< mesurement.parameters[3] <<"\t" << state_rel_entropy(eta, result,8) << std::endl;
+    	TEXTFILE  << mesurement.parameters[0]<< "\t"<<  mesurement.parameters[1] << "\t"<< mesurement.parameters[2] << "\t"<< mesurement.parameters[3] <<"\t" << state_rel_entropy(eta, result,8) << std::endl;
+
+    	}
+    -----------------------------------------------------------------*/
+
+    /*
+        int spaces[3] = {2,2,-2};
+
+        for ( int i = 0 ; i < 1000000; ++i )
+            {
+
+            sample_density_matrix_up ( quqrit,8 );
+            TEXTFILE << state_relative_entropy_of_discord_qubit_ancilla ( quqrit,mesurement,result,spaces,3,8 ) << "\t" << state_quantum_discord_qubit_ancilla ( quqrit,mesurement,result,spaces,3,8 ) << std::endl;
+
+            }
+
+       */
+    /*
+        std::complex < double > cmat   [size*size]={};
+        std::complex < double > tau_v  [size]={};
+        std::complex < double > temp_v [size*size]={};
+
+
+
+
+     for (int i = 0; i < 500000; ++i)
+     {
+       sample_unitary_matrix(quqrit,tau_v,temp_v,size);
+       matrix_eigenvalues(quqrit,temp_v,eigen,size);
+
+       //sample_unitary_matrix(quqrit,size);
+       //matrix_eigenvalues(quqrit,eigen,size);
+       for(int j=0 ; j<size ; ++j)
+       {
+          TEXTFILE << std::arg(eigen[j])<<std::endl;
+       }
+       //TEXTFILE << std::endl;
+
+     }
+    */
+    
+    
+    for ( int i = 0; i < 2000000 ; ++i )
+        {
+
+        sample_separable_state ( sep_state1,3,spaces,3,8 );
+        		 TEXTFILE << state_quantum_discord_qubit_ancilla ( sep_state1,U2,dec_state1,spaces,3,8,10000) << '\t'
+        			  << state_relative_entropy_of_discord_qubit_ancilla ( sep_state1,U2,dec_state1,spaces,3,8,10000 ) << std::endl;
+        			  //<< state_quantum_commutance (sep_state1,4,2,8 ) << std::endl;
+        }
+        
+        
+        
+        
+          std::complex< double >  eta [8*8]   =
+        {
+        _a,_0,_0,_0,_0,_0,_0,_a,
+        _0,_a,_0,_0,_0,_0,_0,_0,
+        _0,_0,_a,_0,_0,_0,_0,_0,
+        _0,_0,_0,_0,_0,_0,_0,_0,
+        _0,_0,_0,_0,_0,_0,_0,_0,
+        _0,_0,_0,_0,_0,_a,_0,_0,
+        _0,_0,_0,_0,_0,_0,_a,_0,
+        _a,_0,_0,_0,_0,_0,_0,_a
+        };
+	
+
+	
+	 std::complex< double >  unity8 [8*8]   =
+        {
+        _1,_0,_0,_0,_0,_0,_0,_0,
+        _0,_1,_0,_0,_0,_0,_0,_0,
+        _0,_0,_1,_0,_0,_0,_0,_0,
+        _0,_0,_0,_1,_0,_0,_0,_0,
+        _0,_0,_0,_0,_1,_0,_0,_0,
+        _0,_0,_0,_0,_0,_1,_0,_0,
+        _0,_0,_0,_0,_0,_0,_1,_0,
+        _0,_0,_0,_0,_0,_0,_0,_1
+        };
+
+    std::complex< double >  test [8*8] =
+        {
+        1 ,2 ,3 ,4 ,5 ,6 ,7 ,8 ,
+        9 ,10,11,12,13,14,15,16,
+        17,18,19,20,21,22,23,24,
+        25,26,27,28,29,30,31,32,
+        33,34,35,36,37,38,39,40,
+        41,42,43,44,45,46,47,48,
+        49,50,51,52,53,54,55,56,
+        57,58,59,60,61,62,63,64
+        };
+
+std::complex< double > rho1[8*8]{};
+std::complex< double > rho2[8*8]{};
+std::complex< double > rho3[8*8]{};
+
+unitary_jarlskog u2(2);
+
+    //std::complex< double > A_B_C[8*8] = {};
+    int a_b_c[3] = {2,2,-2};
+
+    std::complex< double > AB_C[8*8] = {};
+    int ab_c[2] = {4,-2};
+    
+    std::complex< double > A_BC[8*8] = {};
+    int a_bc[2] = {2,-4};
+    
+    std::complex< double > dec_state[8*8] = {};
+    
+    unitary_jarlskog U2 ( 2 );
+    
+    for (int i = 0; i < 100000; ++i)
+    {
+      sample_separable_state(AB_C,8,ab_c,2,8);
+      
+      TEXTFILE << state_quantum_discord_qubit_ancilla(AB_C,u2,dec_state,ab_c,2,8,1)<< '\t';
+      TEXTFILE << state_relative_entropy_of_discord_qubit_ancilla(AB_C,u2,dec_state,ab_c,2,8,1)<< '\t';
+      TEXTFILE << state_geometric_discord_qubit_ancilla(AB_C,u2,dec_state,ab_c,2,8,1)<< '\t';
+      TEXTFILE << state_quantum_commutance(AB_C,4,2,8)<< endl;
+     
+    
+    }
+    
+
+    /*  for ( int turn = 0 ; turn < 100000 ; ++turn )
+          {
+          sample_separable_state ( AB_C,8,ab_c,2,8 );
+
+          double res = state_relative_entropy_of_discord_qubit_ancilla ( AB_C ,U2,dec_state1,a_b_c,3,8,1 );
+          double hs = state_geometric_discord_qubit_ancilla ( AB_C ,U2,dec_state1,a_b_c,3,8,1 );
+
+    double neg1 = state_negativity(AB_C,a_bc,2,8);
+    double neg2 = state_negativity(AB_C,a_b_c,3,8);
+
+              //temp = state_rel_entropy(AB_C,AB_C2,8);
+              // if ( temp < res3){res3=temp;}
+              // TEXTFILE << state_quantum_commutance ( AB_C,4,2,8) << '\t';
+              // TEXTFILE << state_geometric_discord_qubit_ancilla ( AB_C ,U2,dec_state1,ab_c,2,8,1 ) << '\t';
+              // TEXTFILE << state_relative_entropy_of_coherence(AB_C,8)<< '\t';
+              // TEXTFILE << state_negativity(AB_C, ac_b ,3,8) << std::endl;
+
+
+          TEXTFILE << res << '\t'<< hs << '\t'<< neg1 << '\t'<< neg2 << std::endl;
+          }
+          */
+          
+          
+              /*
+        std::complex< double > * IMPORTED_MATRIX;
+        int SIZE_IMPORTED;
+        IMPORTED_MATRIX = Mathematica_import_matrix_from_file ( "../import.txt",SIZE_IMPORTED );
+    */
+    std::cout.precision ( 9 );
+    std::setprecision ( 8 );
+
+        
+        
+	state_depolarizing(input,test,(double)i/1000.0,8);
+	  //matrix_show(test,8);
+	TEXTFILE << (double)i/1000.0 << '\t';
+	//TEXTFILE << state_quantum_discord_qubit_ancilla(test,u2,dec_state,_4_2,2,8,100) << '\t';
+	TEXTFILE << state_relative_entropy_of_discord_qubit_ancilla(test,u2,dec_state,_4_2,2,8,100) << '\t';
+	//TEXTFILE << state_geometric_discord_qubit_ancilla(test,u2,dec_state,_4_2,2,8,200)<<'\t';
+	TEXTFILE << state_quantum_commutance(test,4,2,8)<< endl;
+	
+	
+   
+    
+        //TEXTFILE << tra(BB_A,4,2,8) << endl;
+    for ( int i = 0 ; i < 300; ++i )
+    {
+      TEXTFILE << 1.0*i/300.0 << '\t';  
+      state_amp_damp_bob(eta,test,1.0*i/300.0,8);
+      //matrix_show(test,8);
+      
+      TEXTFILE << state_quantum_discord_qubit_ancilla(test,u2,dec_state,_4_2,2,8,100) << '\t';
+      TEXTFILE << state_relative_entropy_of_discord_qubit_ancilla(test,u2,dec_state,_4_2,2,8,100) << '\t';
+      TEXTFILE << state_geometric_discord_qubit_ancilla(test,u2,dec_state,_4_2,2,8,200)<<'\t';
+      TEXTFILE << state_quantum_commutance(test,4,2,8) << endl;
+      
+    // cout << state_logarithmic_negativity(test,_2_4,2,8) - state_logarithmic_negativity(test,_4_2,2,8) << '\t';
+        }     
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
