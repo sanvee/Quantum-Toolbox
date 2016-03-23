@@ -35,3 +35,6 @@ build
 .kdev4
 plots
 main*.*
+*.pal
+*.dat
+*.kdev4
