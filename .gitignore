@@ -33,4 +33,5 @@
 # Folders
 build
 .kdev4
+plots
 main*.*
