@@ -26,3 +26,15 @@
 *.exe
 *.out
 *.app
+
+# Other
+*.txt
+*.tab
+*.kdev4
+main*.*
+
+# Folders
+".kdev4"
+"build"
+"data"
+"plots"
