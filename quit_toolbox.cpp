@@ -8,10 +8,7 @@ std::complex< double > _neg_i = std::complex< double > ( 0.0,-1.0 );
 double _1_[2] = {1,0};
 double _0_[2] = {0,0};
 
-
 gsl_rng * _R_G = initialise_random_number_gernerators();
-
-
 
 gsl_rng * initialise_random_number_gernerators (
 )
@@ -41,8 +38,6 @@ gsl_rng * initialise_random_number_gernerators (
     return _R_G;
 
     }
-
-
 
 void
 matrix_eigenvalues (
