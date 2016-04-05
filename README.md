@@ -1,13 +1,14 @@
 # Quantum-Toolbox
-This are some routines I wrote for my bachelor thesis. They are not intended to be used by anyone else, and are not fully organized and optimized yet.
+This are some routines I wrote for my bachelor thesis. They are not intended to be used by anyone else, and are not fully organized
+and optimized yet. 
 
 ---Description---
 
 quit_toolbox:
 basic routines:
-matrix multiplication , logarithm, square roots, trace, hermitian conjugates. 
+matrix multiplication , matrix logarithms, matrix square root, trace, hermitian conjugates. 
 generation of random states, 
-relative entropies , Hilbert schmidt norm, negativity  ect. ect. 
+relative entropies , Hilbert schmidt norm, negativity  ect.. ect... 
 
 parametrized_state:
 returns a fully parametrized mixed state separable relative to a split, or a product state or a simple pure state.
