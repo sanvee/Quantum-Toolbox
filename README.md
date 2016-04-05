@@ -20,5 +20,7 @@ implementation of quantum discord, relative entropy of entaglement, information 
 quit_import:
 reads a txtfile with a mathematica exported matrix and converts it into an array.
 
+---this code was completely written by myself ---
 
-
+compile with gcc.4.9
+compiler flags: -lstdc++ -lm -lopenblas -lgsl -llapacke -std=c++11
