@@ -422,7 +422,7 @@ void matrix_eigenvalues ( const std::complex< double >*const cmat, std::complex<
  * CALCULATIONS (level Quantum)
  *------------------------------------------------------------------------------ -*/
 
-double state_hs_norm_herm ( std::complex< double >* in,
+double state_hs_distance ( std::complex< double >* in,
                        int size );
 
 double state_purity ( std::complex< double >* cmat,

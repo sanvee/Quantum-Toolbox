@@ -2021,7 +2021,7 @@ state_logarithmic_negativity (
 
 
 double
-state_hs_norm_herm (
+state_hs_distance (
     std::complex < double >*in,
     int size )
     {
@@ -2347,9 +2347,6 @@ matrix_square_root (
 
     cblas_zgemm ( CblasRowMajor,CblasNoTrans,CblasConjTrans,size,size,size,_1_,temp,size,in_copy,size,_0_,out,size );
 
-    // matrix_hermitian_conjugate ( in_copy, size );
-
-    // matrix_mlt ( temp, in_copy, out, size );
 
     }
 
